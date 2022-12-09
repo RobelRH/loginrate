@@ -41,18 +41,19 @@ function attemptIPCounter(clientIP, res) {
             let elapsedTimeHour = (currentTimeStamp - ipRecord[i].initialAttempt) / 1000
             let elapsedTimeMin = (currentTimeStamp - ipRecord[i].finalAttempt) / 1000
             let totalAttempt = ipRecord[i].total
-            // 5 times in 1 minute
-            if(elapsedTimeMin < 60 && totalAttempt >= 5 && totalAttempt < 15) {
+            // if you try 5 times in 1 minute
+            if(elapsedTimeMin < 60 && totalAttempt >= 5 && totalAttempt < 15 && ipRecord[i].tempCount >= 5) {
                 ipRecord[i].total += 1
+                ipRecord[i].tempCount += 1
                 ipRecord[i].finalAttempt = currentTimeStamp
                 saveJson("ipRecord.json", ipRecord)
                 return res.json({success: false, "message": "total limit reached - maximum allowed 5 times per minute"})
             }
-            // 15 times in 1 hour
+            // if you try 15 times in 1 hour
             else if(elapsedTimeHour < 3600 && totalAttempt == 15) {
                 return res.json({success: false, "message": "total limit reached - maximum allowed 15 times per hour"})
             }
-            // reset time if 1 hour passed
+            // if 1 hour passed reset time
             else if(elapsedTimeHour > 3600) {
                 ipRecord[i].total = 1
                 ipRecord[i].initialAttempt = currentTimeStamp
@@ -61,6 +62,13 @@ function attemptIPCounter(clientIP, res) {
             }
             // update total attempt of specific ip address
             else {
+                if(elapsedTimeMin > 60) {
+                    ipRecord[i].tempCount = 1
+                }
+                else {
+                    ipRecord[i].tempCount += 1
+                }
+
                 ipRecord[i].total += 1
                 ipRecord[i].finalAttempt = currentTimeStamp
                 saveJson("ipRecord.json", ipRecord)
@@ -71,7 +79,7 @@ function attemptIPCounter(clientIP, res) {
 
     // if no ip found on the record list push it into the file
     if(!getExistingIp) {
-        ipRecord.push({clientIP: clientIP, initialAttempt: currentTimeStamp, finalAttempt: currentTimeStamp, total: 1})
+        ipRecord.push({clientIP: clientIP, initialAttempt: currentTimeStamp, finalAttempt: currentTimeStamp, total: 1, tempCount: 1})
         saveJson("ipRecord.json", ipRecord)
         return res.json({success: true, "message": "attempt ip passed / allowed"})
     }
@@ -92,7 +100,7 @@ function loginRateLimiter(clientIP, cookieId='', username, res) {
     // attemptUsernameCounter(username);
 }
 
-app.get('/', (req, res) => {
+app.post('/', (req, res) => {
     var ip = req.body.ip;
     var cookieId = req.body.cookieId;
     var username = req.body.username;
